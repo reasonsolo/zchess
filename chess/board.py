@@ -1,10 +1,14 @@
+# -*- coding: utf-8 -*-
+import copy
+
+class InvalidMoveError(Exception):
+    pass
 
 class Side:
     RED = 1
     BLACK = 2
     def oppsite(side):
         return Side.BLACK if side == Side.RED else Side.RED
-
 
 class Board:
     width = 9
@@ -41,10 +45,23 @@ class Board:
         self.side = Side.RED
         self.steps = 0
 
+    def clone(self):
+        b = Board()
+        b.pieces = copy.deepcopy(self.pieces)
+        b.defeated = copy.deepcopy(self.defeated)
+        b.generals = {
+            Side.RED: b.pieces[Board.init_positions['G'][0]],
+            Side.BLACK: b.pieces[Board.init_positions['g'][0]],
+        }
+        b.checkmate = copy.deepcopy(self.checkmate)
+        b.side = copy.deepcopy(self.side)
+        b.steps = self.steps
+        return b
+
     def init_game(self):
         # red at the bottom, black at the top
         # coordinate starting from left-bottom corner
-        from piece import create_piece
+        from chess.piece import create_piece
         for code, positions in Board.init_positions.items():
             for pos in positions:
                 self.pieces[pos] = create_piece(code, pos, self)
@@ -69,37 +86,71 @@ class Board:
         """
         pass
 
+    def last_side(self):
+        return Side.oppsite(self.side)
+
+    def cur_side(self):
+        return self.side
+
+    # FIXME: cannot draw
     def draw(self):
         return self.steps > 600
 
     def has_winner(self):
-        return not self.draw() and self.winner is not None
+        return self.winner() is not None
 
     def winner(self):
-        for k in self.generals:
-            if k.alive == False:
-                lose_side = k.alive
-        return Side.oppsite(lose_side) if lose_side is None else None
+        lose_side = None
+        for i, g in self.generals.items():
+            if g.alive == False:
+                lose_side = g.side
+
+        if lose_side is None:
+            for side in (Side.RED, Side.BLACK):
+                if len(self.movable_pieces(side)) == 0:
+                    lose_side = side
+        return Side.oppsite(lose_side) if lose_side is not None else None
 
     def move(self, piece, x, y):
         defeated = None
+        if self.side != piece.side:
+            raise InvalidMoveError
         if (x, y) in self.pieces:
             defeated = self.pieces[x, y]
-        if defeated is not None:
             defeated.defeat()
             self.defeated.append(defeated)
-            print("%s@(%d, %d) defeated" % (defeated, defeated.x, defeated.y))
+            # print("%s@(%d, %d) defeated" % (defeated, defeated.x, defeated.y))
         del self.pieces[piece.x, piece.y]
         piece.move(x, y)
         self.pieces[x, y] = piece
         self.switch_side()
+        self.steps += 1
 
     def switch_side(self):
         self.side = Side.oppsite(self.side)
-        print("switch to %s" % self.side)
 
-    def movable_pieces(self):
-        return [piece for _, piece in self.pieces.items() if piece.side == self.side]
+    def movable_pieces(self, side = None):
+        if side == None:
+            side = self.side
+        return [piece for piece in self.pieces.values() if piece.side == side and len(piece.possible_moves()) > 0]
+
+    def all_moves(self, side = None):
+        if side == None:
+            side = self.side
+        return [(piece, move) for piece in self.pieces.values() if piece.side == side for move in piece.possible_moves()]
+
+    def state(self):
+        state_str = str(self.side) + "|" + str(self.steps) + "|"
+        for y in range(0, Board.height):
+            for x in range(0, Board.width):
+                if (x, y) not in self.pieces:
+                    state_str += "_"
+                else:
+                    state_str += str(self.pieces[x, y])
+                    # piece = self.pieces[x, y]
+                    # if (piece.x, piece.y) != (x, y):
+                    #     print("invalid piece state")
+        return state_str
 
     def __repr__(self):
         ret = "Board\n"

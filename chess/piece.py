@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
-from state import GameState
-from board import Side, Board
+from chess.board import Side, Board
 
 class InvalidPieceError(Exception):
     pass
@@ -38,6 +37,10 @@ class Piece:
 
     def __repr__(self):
         raise NotImplementedError
+
+    def __str__(self):
+        code = CODE_PIECES[self.__class__]
+        return code if self.side == Side.RED else code.lower()
 
 
 class General(Piece):
@@ -100,7 +103,7 @@ class Elephant(Piece):
 
     def can_move(self, x, y):
         hole = (self.x+x)/2, (self.y+y)/2
-        if self.board.piece_at(hole) is not None:
+        if self.board.piece_at(*hole) is not None:
             return False
         if self.side == Side.RED:
             return y in range(0, 5)
@@ -177,7 +180,7 @@ class Cannon(Piece):
             has_pivot = 0
             if self.x == x:
                 for e, i in enumerate(range(self.y, y, -1 if self.y > y else 1)):
-                    if e == 0:
+                    if e == 0 or e == abs(self.y-y):
                         continue
                     if not has_pivot and self.board.piece_at(self.x, i) is not None:
                         has_pivot = True
@@ -185,7 +188,7 @@ class Cannon(Piece):
                         return False
             if self.y == y:
                 for e, i in enumerate(range(self.x, x, -1 if self.x > x else 1)):
-                    if e == 0:
+                    if e == 0 or e == abs(self.x-x):
                         continue
                     if not has_pivot and self.board.piece_at(i, self.y) is not None:
                         has_pivot = True
@@ -223,6 +226,7 @@ PIECE_CODES = {
     'S': Soldier,
 }
 
+CODE_PIECES = {v: k for k, v in PIECE_CODES.items()}
 
 def create_piece(code, position, board):
     side = Side.RED if code.isupper() else Side.BLACK

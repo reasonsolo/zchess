@@ -1,10 +1,8 @@
-from board import Board
+from chess.board import Board
 import random
-import copy
 
 if __name__ == '__main__':
     b = Board()
-    b2 = b.clone()
     for i in range(0, 1000):
         if b.has_winner():
             print("winner is ", b.winner())
@@ -18,5 +16,4 @@ if __name__ == '__main__':
         b.move(piece, *move)
         print(b)
         print(b.state())
-        print(b2.state())
         input(" ")

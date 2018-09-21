@@ -31,17 +31,18 @@ class Node:
             + str(self.visits) + " U:" + str(self.untried_moves) + "]"
 
 
+# FIXME: buggy
 def UCT(rootstate, itermax, verbose=False):
     root = Node(state=rootstate)
     for i in range(itermax):
         node = root
         state = rootstate.clone()
-
+        print(state)
         # select
         # fully expanded but non-terminal
         while len(node.untried_moves) == 0 and len(node.children) > 0:
             node = node.uct_select_child()
-            state = rootstate.clone()
+            state.move(node.move)
 
         # expand
         if len(node.untried_moves) > 0:
@@ -57,6 +58,7 @@ def UCT(rootstate, itermax, verbose=False):
         while node != None:
             node.update(state.last_player_is_winner())
             node = node.parent
+        print(state)
 
     return sorted(root.children, key = lambda c: c.visits)[-1].move
 

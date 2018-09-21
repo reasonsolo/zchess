@@ -4,6 +4,9 @@ import copy
 class InvalidMoveError(Exception):
     pass
 
+class InvalidBoardError(Exception):
+    pass
+
 class Side:
     RED = 1
     BLACK = 2
@@ -32,31 +35,37 @@ class Board:
         'c': [(1, 7), (7, 7)],
         's': [(0, 6), (2, 6), (4, 6), (6, 6), (8, 6)]
     }
-
-    def __init__(self):
+    id = 0
+    def __init__(self, init=True):
         self.pieces = {}
         self.defeated = []
-        self.init_game()
-        self.generals = {
-            Side.RED: self.pieces[Board.init_positions['G'][0]],
-            Side.BLACK: self.pieces[Board.init_positions['g'][0]],
-        }
+        self.generals = {}
         self.checkmate = None
         self.side = Side.RED
         self.steps = 0
+        if init:
+            self.init_game()
 
     def clone(self):
-        b = Board()
-        b.pieces = copy.deepcopy(self.pieces)
-        b.defeated = copy.deepcopy(self.defeated)
-        b.generals = {
-            Side.RED: b.pieces[Board.init_positions['G'][0]],
-            Side.BLACK: b.pieces[Board.init_positions['g'][0]],
-        }
-        b.checkmate = copy.deepcopy(self.checkmate)
-        b.side = copy.deepcopy(self.side)
+        b = Board(init=False)
+        from chess.piece import General
+        for (x, y), p in self.pieces.items():
+            piece = p.__class__(p.side, (p.x, p.y), b)
+            b.pieces[x, y] = piece
+            if isinstance(p, General):
+                b.generals[piece.side] = piece
+        for p in self.defeated:
+            piece = p.__class__(p.side, (p.x, p.y), b)
+            piece.alive = False
+            b.defeated.append(piece)
+        print("cpy %s\n to %s" % (self.state(), b.state()))
+        b.checkmate = self.checkmate
+        b.side = self.side
         b.steps = self.steps
         return b
+
+    def __deepcopy__(self, memo):
+        return self.clone()
 
     def init_game(self):
         # red at the bottom, black at the top
@@ -65,6 +74,10 @@ class Board:
         for code, positions in Board.init_positions.items():
             for pos in positions:
                 self.pieces[pos] = create_piece(code, pos, self)
+        self.generals = {
+            Side.RED: self.pieces[Board.init_positions['G'][0]],
+            Side.BLACK: self.pieces[Board.init_positions['g'][0]],
+        }
 
     def can_move(self, piece, x, y):
         if x == piece.x and y == piece.y:
@@ -119,12 +132,13 @@ class Board:
             defeated = self.pieces[x, y]
             defeated.defeat()
             self.defeated.append(defeated)
-            # print("%s@(%d, %d) defeated" % (defeated, defeated.x, defeated.y))
+            del self.pieces[x, y]
         del self.pieces[piece.x, piece.y]
         piece.move(x, y)
         self.pieces[x, y] = piece
         self.switch_side()
         self.steps += 1
+        # print("move %s" % self.state())
 
     def switch_side(self):
         self.side = Side.oppsite(self.side)
@@ -135,6 +149,8 @@ class Board:
         return [piece for piece in self.pieces.values() if piece.side == side and len(piece.possible_moves()) > 0]
 
     def all_moves(self, side = None):
+        if self.has_winner():
+            return []
         if side == None:
             side = self.side
         return [(piece, move) for piece in self.pieces.values() if piece.side == side for move in piece.possible_moves()]
@@ -151,6 +167,12 @@ class Board:
                     # if (piece.x, piece.y) != (x, y):
                     #     print("invalid piece state")
         return state_str
+
+    def piece_check(self):
+        for (x, y), p in self.pieces.items():
+            if (x, y) != (p.x, p.y):
+                print("invalid state %s (%d, %d) (%d, %d)" % (piece, piece.x, piece.y, x, y))
+                raise InvalidBoardError
 
     def __repr__(self):
         ret = "Board\n"
